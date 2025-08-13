@@ -3,6 +3,7 @@ const db = require('./models');
 const authRoutes = require('./routes/authRoutes');
 const okrRoutes = require('./routes/okrRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const keyResultRoutes = require('./routes/keyResultRoutes');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -24,6 +25,7 @@ db.sequelize.sync({ alter: true })
 app.use('/api/auth', authRoutes);
 app.use('/api/okrs', okrRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/key-results', keyResultRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);

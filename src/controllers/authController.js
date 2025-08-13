@@ -8,9 +8,11 @@ exports.register = async (req, res) => {
   try {
     const { email, password, first_name, last_name } = req.body;
     const user = await User.create({ email, password });
-    await Profile.create({ id: user.id, first_name, last_name });
+    const profile = await Profile.create({ id: user.id, first_name, last_name });
+    
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.status(201).json({ user, token });
+    
+    res.status(201).json({ user: { ...user.toJSON(), profile }, token });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -19,7 +21,11 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ 
+      where: { email },
+      include: [{ model: Profile, as: 'profile' }]
+    });
+    
     if (!user) {
       return res.status(401).json({ error: 'Login failed!' });
     }
@@ -27,7 +33,9 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ error: 'Login failed!' });
     }
+    
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    
     res.status(200).json({ user, token });
   } catch (error) {
     res.status(400).json({ error: error.message });
