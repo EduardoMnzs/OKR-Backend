@@ -3,6 +3,7 @@ const Okr = db.Okr;
 const KeyResult = db.KeyResult;
 const Comment = db.Comment;
 const User = db.User;
+const Profile = db.Profile
 const { sendEmailNotification } = require('../services/emailService')
 
 const getUserEmail = async (userId) => {
@@ -29,7 +30,7 @@ const calculateOKRStatus = (dueDate, progress) => {
     const deadline = new Date(dueDate);
     const diffTime = deadline.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (progress >= 100) {
         return 'completed';
     }
@@ -54,7 +55,7 @@ exports.create = async (req, res) => {
             due_date,
             user_id: req.user.id
         });
-        
+
         const userEmail = await getUserEmail(req.user.id);
         if (userEmail) {
             const emailContent = `<p>A OKR <strong>"${newOkr.title}"</strong> foi criada com sucesso.</p>`;
@@ -81,7 +82,7 @@ exports.findAll = async (req, res) => {
                 { model: Comment, as: 'comments' }
             ]
         });
-        
+
         const okrsWithStatus = okrs.map(okr => {
             const progress = calculateOverallProgress(okr.keyResults);
             const status = calculateOKRStatus(okr.due_date, progress);
@@ -109,14 +110,14 @@ exports.findOne = async (req, res) => {
                 { model: Comment, as: 'comments' }
             ]
         });
-        
+
         if (!okr) {
             return res.status(404).json({ message: 'OKR not found or not authorized' });
         }
-        
+
         const progress = calculateOverallProgress(okr.keyResults);
         const status = calculateOKRStatus(okr.due_date, progress);
-        
+
         const okrWithStatus = {
             ...okr.toJSON(),
             progress: progress,
@@ -134,7 +135,7 @@ exports.update = async (req, res) => {
     try {
         const { id } = req.params;
         const { title, description, responsible, due_date } = req.body;
-        
+
         const okrToUpdate = await Okr.findOne({
             where: { id: id, user_id: req.user.id },
             include: [{ model: KeyResult, as: 'keyResults' }]
@@ -163,7 +164,7 @@ exports.update = async (req, res) => {
                 { model: Comment, as: 'comments' }
             ]
         });
-        
+
         const userEmail = await getUserEmail(req.user.id);
         if (userEmail) {
             const emailContent = `<p>A OKR <strong>"${updatedOkr.title}"</strong> foi atualizada com sucesso.</p>`;
@@ -173,7 +174,7 @@ exports.update = async (req, res) => {
                 emailContent
             );
         }
-        
+
         return res.status(200).json({
             ...updatedOkr.toJSON(),
             progress: progress,
@@ -189,13 +190,13 @@ exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
         const okrToDelete = await Okr.findOne({ where: { id: id, user_id: req.user.id } });
-        
+
         if (!okrToDelete) {
             return res.status(404).json({ error: 'OKR not found or not authorized' });
         }
 
         await okrToDelete.destroy();
-        
+
         const userEmail = await getUserEmail(req.user.id);
         if (userEmail) {
             const emailContent = `<p>A OKR <strong>"${okrToDelete.title}"</strong> foi excluída com sucesso.</p>`;
@@ -205,7 +206,7 @@ exports.delete = async (req, res) => {
                 emailContent
             );
         }
-        
+
         return res.status(204).send();
     } catch (error) {
         console.error('Erro ao excluir OKR:', error);
@@ -215,38 +216,82 @@ exports.delete = async (req, res) => {
 
 // Criar um Key Result para um OKR específico
 exports.createKeyResult = async (req, res) => {
-  try {
-    const { okrId } = req.params;
-    const { title, target, unit, current_value } = req.body;
-    const okr = await Okr.findOne({ where: { id: okrId, user_id: req.user.id } });
+    try {
+        const { okrId } = req.params;
+        const { title, target, unit, current_value } = req.body;
+        const okr = await Okr.findOne({ where: { id: okrId, user_id: req.user.id } });
 
-    if (!okr) {
-      return res.status(404).json({ error: "OKR not found or not authorized." });
+        if (!okr) {
+            return res.status(404).json({ error: "OKR not found or not authorized." });
+        }
+
+        const keyResult = await KeyResult.create({
+            title,
+            target,
+            unit,
+            current_value,
+            okr_id: okrId,
+        });
+
+        const updatedOkrWithKrs = await Okr.findByPk(okrId, {
+            include: [{ model: KeyResult, as: 'keyResults' }]
+        });
+
+        const progress = calculateOverallProgress(updatedOkrWithKrs.keyResults);
+        const status = calculateOKRStatus(updatedOkrWithKrs.due_date, progress);
+
+        await Okr.update({ status: status }, { where: { id: okrId } });
+
+        res.status(201).json({
+            ...keyResult.toJSON(),
+            okrProgress: progress,
+            okrStatus: status,
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
+};
 
-    const keyResult = await KeyResult.create({
-      title,
-      target,
-      unit,
-      current_value,
-      okr_id: okrId,
-    });
+exports.createComment = async (req, res) => {
+    try {
+        const { okrId } = req.params;
+        const { content } = req.body;
 
-    const updatedOkrWithKrs = await Okr.findByPk(okrId, {
-        include: [{ model: KeyResult, as: 'keyResults' }]
-    });
-    
-    const progress = calculateOverallProgress(updatedOkrWithKrs.keyResults);
-    const status = calculateOKRStatus(updatedOkrWithKrs.due_date, progress);
+        const okr = await Okr.findOne({ where: { id: okrId, user_id: req.user.id } });
+        if (!okr) {
+            return res.status(404).json({ error: "OKR not found or not authorized." });
+        }
 
-    await Okr.update({ status: status }, { where: { id: okrId } });
-    
-    res.status(201).json({
-        ...keyResult.toJSON(),
-        okrProgress: progress,
-        okrStatus: status,
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+        const comment = await Comment.create({
+            content,
+            okr_id: okrId,
+            user_id: req.user.id,
+        });
+
+        // Retorna o comentário recém-criado
+        res.status(201).json(comment);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Obter todos os comentários de uma OKR
+exports.getComments = async (req, res) => {
+    try {
+        const { okrId } = req.params;
+
+        const comments = await Comment.findAll({
+            where: { okr_id: okrId },
+            include: [{
+                model: User,
+                as: 'user',
+                include: [{ model: Profile, as: 'profile' }],
+            }],
+            order: [['createdAt', 'DESC']],
+        });
+
+        res.status(200).json(comments);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };

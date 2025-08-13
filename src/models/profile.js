@@ -17,9 +17,8 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Profile.associate = (models) => {
-    // Um Profile pertence a um User
     Profile.belongsTo(models.User, {
-      foreignKey: 'id', // Usa 'id' do perfil como a chave estrangeira
+      foreignKey: 'id',
       as: 'user'
     });
   };
