@@ -3,12 +3,14 @@ const db = require('./models');
 const authRoutes = require('./routes/authRoutes');
 const okrRoutes = require('./routes/okrRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
+app.use(cors());
 
 db.sequelize.sync({ alter: true })
   .then(() => {
