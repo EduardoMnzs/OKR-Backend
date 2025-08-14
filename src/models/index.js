@@ -10,7 +10,6 @@ db.KeyResult = require('./key_result')(sequelize, Sequelize.DataTypes);
 db.Comment = require('./comment')(sequelize, Sequelize.DataTypes);
 db.User = require('./user')(sequelize, Sequelize.DataTypes);
 db.Profile = require('./profile')(sequelize, Sequelize.DataTypes);
-db.Notification = require('./notification')(sequelize, Sequelize.DataTypes);
 
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {

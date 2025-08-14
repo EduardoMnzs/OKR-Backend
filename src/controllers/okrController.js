@@ -59,7 +59,7 @@ exports.create = async (req, res) => {
 
         await Notification.create({
             user_id: req.user.id,
-            event_type: 'update',
+            event_type: 'create',
             message: `O OKR '${title}' foi criado.`,
             link_to: `/okr/${newOkr.id}`
         });
@@ -292,12 +292,10 @@ exports.createComment = async (req, res) => {
             user_id: req.user.id,
         });
 
-        // CORREÇÃO: Busque o perfil do usuário que está comentando
         const commentingUser = await User.findByPk(req.user.id, {
             include: [{ model: Profile, as: 'profile' }]
         });
 
-        // Verifique se o perfil existe antes de usar
         if (commentingUser && commentingUser.profile) {
             await Notification.create({
                 user_id: okr.user_id,
@@ -329,19 +327,6 @@ exports.getComments = async (req, res) => {
         });
 
         res.status(200).json(comments);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-};
-
-exports.getNotifications = async (req, res) => {
-    try {
-        const notifications = await Notification.findAll({
-            where: { user_id: req.user.id },
-            order: [['createdAt', 'DESC']],
-            limit: 3,
-        });
-        res.status(200).json(notifications);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
