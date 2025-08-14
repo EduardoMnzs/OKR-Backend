@@ -57,6 +57,13 @@ exports.create = async (req, res) => {
             user_id: req.user.id
         });
 
+        await Notification.create({
+            user_id: req.user.id,
+            event_type: 'update',
+            message: `O OKR '${title}' foi criado.`,
+            link_to: `/okr/${newOkr.id}`
+        });
+
         const userEmail = await getUserEmail(req.user.id);
         if (userEmail) {
             const emailContent = `<p>A OKR <strong>"${newOkr.title}"</strong> foi criada com sucesso.</p>`;
@@ -137,6 +144,7 @@ exports.update = async (req, res) => {
         const { id } = req.params;
         const { title, description, responsible, due_date } = req.body;
 
+        // Busque o OKR para verificar a posse e obter os Key Results
         const okrToUpdate = await Okr.findOne({
             where: { id: id, user_id: req.user.id },
             include: [{ model: KeyResult, as: 'keyResults' }]
@@ -146,9 +154,11 @@ exports.update = async (req, res) => {
             return res.status(404).json({ error: 'OKR not found or not authorized' });
         }
 
+        // Calcule o progresso e o status dinamicamente
         const progress = calculateOverallProgress(okrToUpdate.keyResults);
         const status = calculateOKRStatus(due_date || okrToUpdate.due_date, progress);
 
+        // Atualiza a OKR no banco de dados
         await Okr.update({
             title,
             description,
@@ -159,13 +169,28 @@ exports.update = async (req, res) => {
             where: { id: id, user_id: req.user.id }
         });
 
+        // NOTIFICAÇÃO 1: Crie uma notificação no banco de dados
         await Notification.create({
             user_id: req.user.id,
             event_type: 'update',
             message: `O OKR '${title}' foi atualizado.`,
             link_to: `/okr/${id}`
         });
-        console.log('Notificação de atualização criada para o usuário:', req.user.id);
+
+        // Obtenha o usuário completo para enviar o e-mail
+        const updatingUser = await User.findByPk(req.user.id, {
+            include: [{ model: Profile, as: 'profile' }]
+        });
+        
+        // NOTIFICAÇÃO 2: Envie o e-mail para o usuário que fez a alteração
+        if (updatingUser && updatingUser.email) {
+            const emailContent = `<p>Olá ${updatingUser.profile?.first_name || ''},<br/><br/>Seu OKR <strong>"${title}"</strong> foi atualizado com sucesso.</p>`;
+            await sendEmailNotification(
+                updatingUser.email,
+                `OKR Atualizada: ${title}`,
+                emailContent
+            );
+        }
 
         const updatedOkr = await Okr.findByPk(id, {
             include: [
@@ -173,16 +198,6 @@ exports.update = async (req, res) => {
                 { model: Comment, as: 'comments' }
             ]
         });
-
-        const userEmail = await getUserEmail(req.user.id);
-        if (userEmail) {
-            const emailContent = `<p>A OKR <strong>"${updatedOkr.title}"</strong> foi atualizada com sucesso.</p>`;
-            await sendEmailNotification(
-                userEmail,
-                `OKR Atualizada: ${updatedOkr.title}`,
-                emailContent
-            );
-        }
 
         return res.status(200).json({
             ...updatedOkr.toJSON(),
@@ -277,12 +292,20 @@ exports.createComment = async (req, res) => {
             user_id: req.user.id,
         });
 
-        await Notification.create({
-            user_id: okr.user_id,
-            event_type: 'comment',
-            message: `${req.user.profile.first_name} comentou no OKR '${okr.title}'.`,
-            link_to: `/okr/${okrId}`
+        // CORREÇÃO: Busque o perfil do usuário que está comentando
+        const commentingUser = await User.findByPk(req.user.id, {
+            include: [{ model: Profile, as: 'profile' }]
         });
+
+        // Verifique se o perfil existe antes de usar
+        if (commentingUser && commentingUser.profile) {
+            await Notification.create({
+                user_id: okr.user_id,
+                event_type: 'comment',
+                message: `${commentingUser.profile.first_name} comentou no OKR '${okr.title}'.`,
+                link_to: `/okr/${okrId}`
+            });
+        }
         
         res.status(201).json(comment);
     } catch (error) {
