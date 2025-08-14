@@ -4,6 +4,7 @@ const KeyResult = db.KeyResult;
 const Comment = db.Comment;
 const User = db.User;
 const Profile = db.Profile
+const Notification = db.Notification;
 const { sendEmailNotification } = require('../services/emailService')
 
 const getUserEmail = async (userId) => {
@@ -158,6 +159,14 @@ exports.update = async (req, res) => {
             where: { id: id, user_id: req.user.id }
         });
 
+        await Notification.create({
+            user_id: req.user.id,
+            event_type: 'update',
+            message: `O OKR '${title}' foi atualizado.`,
+            link_to: `/okr/${id}`
+        });
+        console.log('Notificação de atualização criada para o usuário:', req.user.id);
+
         const updatedOkr = await Okr.findByPk(id, {
             include: [
                 { model: KeyResult, as: 'keyResults' },
@@ -268,7 +277,13 @@ exports.createComment = async (req, res) => {
             user_id: req.user.id,
         });
 
-        // Retorna o comentário recém-criado
+        await Notification.create({
+            user_id: okr.user_id,
+            event_type: 'comment',
+            message: `${req.user.profile.first_name} comentou no OKR '${okr.title}'.`,
+            link_to: `/okr/${okrId}`
+        });
+        
         res.status(201).json(comment);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -291,6 +306,19 @@ exports.getComments = async (req, res) => {
         });
 
         res.status(200).json(comments);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getNotifications = async (req, res) => {
+    try {
+        const notifications = await Notification.findAll({
+            where: { user_id: req.user.id },
+            order: [['createdAt', 'DESC']],
+            limit: 3,
+        });
+        res.status(200).json(notifications);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -12,7 +12,21 @@ exports.register = async (req, res) => {
     
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     
-    res.status(201).json({ user: { ...user.toJSON(), profile }, token });
+    res.status(201).json({ 
+      user: {
+        id: user.id,
+        email: user.email,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        profile: {
+          id: profile.id,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          created_at: profile.createdAt,
+        }
+      }, 
+      token 
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -36,7 +50,21 @@ exports.login = async (req, res) => {
     
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     
-    res.status(200).json({ user, token });
+    res.status(200).json({ 
+      user: {
+        id: user.id,
+        email: user.email,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        profile: {
+          id: user.profile.id,
+          first_name: user.profile.first_name,
+          last_name: user.profile.last_name,
+          created_at: user.profile.createdAt,
+        }
+      }, 
+      token 
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

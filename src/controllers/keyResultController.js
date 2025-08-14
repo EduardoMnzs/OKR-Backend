@@ -31,7 +31,6 @@ exports.update = async (req, res) => {
 
     if (updated) {
       const updatedKr = await KeyResult.findByPk(id);
-      // Aqui você poderia adicionar lógica de e-mail de notificação para KR
       return res.status(200).json(updatedKr);
     }
     throw new Error('Key Result not found');

@@ -5,6 +5,9 @@ const keyResultController = require('../controllers/keyResultController');
 const commentController = require('../controllers/commentController');
 const auth = require('../middleware/auth');
 
+// Rotas para Notificações
+router.get('/notifications', auth, okrController.getNotifications);
+
 // Rotas para OKRs (protegidas)
 router.post('/', auth, okrController.create);
 router.get('/', auth, okrController.findAll);
